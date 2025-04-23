@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Mensal de Chamadas</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <div class="report-info">
+                <p>Data de Emissão: {{ issue_date }}</p>
+                <p>Hora: {{ issue_time }}</p>
+            </div>
+        </div>
+        <h1>Relatório Mensal de Chamadas</h1>
+    </header>
+    <main>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2" class="header-col">Nome da Ilha</th>
+                    <th colspan="5">Quantidade de Ligações</th>
+                    <th colspan="2">Serviço</th>
+                    <th colspan="2">Retornos</th>
+                </tr>
+                <tr>
+                    <th>Total</th>
+                    <th>Total Atend.</th>
+                    <th>Aban.</th>
+                    <th>Aban.(%)</th>
+                    <th>TMA</th>
+                    <th>TME</th>
+                    <th>SLA</th>
+                    <th>Qtde.</th>
+                    <th>SLR(%)</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                {% for item in data %}
+                <tr>
+                    <td class="data-col">{{ item.nome }}</td>
+                    <td>{{ item.total }}</td>
+                    <td>{{ item.total_atend }}</td>
+                    <td>{{ item.aban }}</td>
+                    <td>{{ item.aban_percent }}</td>
+                    <td>{{ item.tma }}</td>
+                    <td>{{ item.tme }}</td>
+                    <td>{{item.sl}}</td>
+                    <td>{{item.qtde}}</td>
+                    <td>{{item.slr}}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td class="data-col">Total/Média</td>
+                    <td>{{ totals.total }}</td>
+                    <td>{{ totals.total_atend }}</td>
+                    <td>{{ totals.aban }}</td>
+                    <td>{{ totals.aban_percent }}</td>
+                    <td>{{ totals.tma }}</td>
+                    <td>{{ totals.tme }}</td>
+                    <td>{{ totals.sla }}</td>
+                    <td>{{ totals.qtde }}</td>
+                    <td>{{ totals.slr}} </td>
+                </tr>
+            </tbody>
+        </table>
+    </main>
+</body>
+</html>

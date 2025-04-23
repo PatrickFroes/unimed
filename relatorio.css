@@ -1,0 +1,97 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  color: #333;
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.logo {
+  width: 200px;
+  margin-right: 15px;
+}
+
+.report-info p {
+  font-size: 12px;
+  margin: 0;
+}
+
+h1 {
+  font-size: 24px;
+  color: #333;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #fff;
+}
+
+thead {
+  background-color: #333;
+  color: #fff;
+}
+
+thead th {
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+th {
+  text-align: left;
+}
+
+thead th[colspan] {
+  text-align: center;
+}
+
+thead th[rowspan] {
+  vertical-align: middle;
+}
+
+.header-col {
+  font-weight: bold;
+  border-right: 2px solid #ddd; /* Linha separando a coluna inicial das outras */
+}
+
+tbody th, td {
+  padding: 10px;
+  border: none; /* Remove as bordas das células */
+}
+
+tbody .data-col {
+  font-weight: bold;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tbody tr:hover {
+  background-color: #f1f1f1;
+}
+
+.total-row {
+  font-weight: bold;
+  background-color: #e0e0e0;
+  border-top: 2px solid #ddd; /* Linha superior para a linha de total */
+}
