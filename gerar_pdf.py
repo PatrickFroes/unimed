@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 data = []
 
+config = pdfkit.configuration(wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe')
 
 def average_times(times):
     total_time = timedelta()
@@ -125,7 +126,7 @@ def create_pdf():
 
     # Caminho para o arquivo CSS e PDF
     css_file = "relatorio.css"
-    output_pdf = f"Relatorio_{previousMonth}.pdf"
+    output_pdf = f"relatorios\\Relatorio_{previousMonth}.pdf"
 
     # Data do relatório
     issue_date = datetime.now().strftime("%d/%m/%Y")
@@ -139,6 +140,6 @@ def create_pdf():
     # Gerar o PDF
     options = {"no-outline": None, "enable-local-file-access": None}
 
-    pdfkit.from_string(html_content, output_pdf, options=options, css=css_file)
+    pdfkit.from_string(html_content, output_pdf, configuration=config, options=options, css=css_file)
 
     print(f"PDF gerado com sucesso: {output_pdf}")
