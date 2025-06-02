@@ -26,8 +26,17 @@ username, password = text.strip().split()
 
 client = Five9(username=username, password=password)
 # 1.1 - Certifique-se de que as datas estejam em UTC (Five9 espera UTC)
-start = "2025-05-01T00:00:00.000"
-end = "2025-05-30T23:59:59.000"
+# Ajuste aqui para garantir que o período seja o correto em Brasília
+start_brasilia = datetime(2025, 5, 1, 0, 0, 0)
+end_brasilia = datetime(2025, 5, 31, 23, 59, 59)
+
+def brasilia_to_utc_str(dt_brasilia):
+    dt_utc = dt_brasilia - timedelta(hours=3)
+    return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000")
+
+start = brasilia_to_utc_str(start_brasilia)
+# Corrija aqui: não adicione segundos/milissegundos extras, apenas converta normalmente
+end = brasilia_to_utc_str(end_brasilia)
 
 def split_periods(start_str, end_str, n=4):
     # 1.1 - Parse as datas como UTC
@@ -133,10 +142,25 @@ async def getRelatorioChamadas(period_criteria, transformed_data_list):
         record_data = record["values"]["data"]
         if record_data[3] is None:
             record_data[3] = 0
+
+        # Corrigir o cálculo do total para garantir precisão e evitar -1
+        def safe_total(val):
+            try:
+                if val is None:
+                    return 0
+                if isinstance(val, str):
+                    val = val.replace(',', '.')
+                    return int(round(float(val)))
+                if isinstance(val, float):
+                    return int(round(val))
+                return int(val)
+            except Exception:
+                return 0
+
         transformed_data = {
             "nome": record_data[0],
             "total_atend": int(record_data[1]) if record_data[1] else 0,
-            "total": int(record_data[4]) if record_data[4] else 0,
+            "total": safe_total(record_data[4]),
             "aban": (
                 round(float(record_data[2]), 2) if record_data[2] is not None else 0
             ),

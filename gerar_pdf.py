@@ -96,9 +96,21 @@ def create_pdf():
         "Dezembro",
     ]
 
+    # Corrigir o cálculo do total para garantir precisão
+    def safe_int(val):
+        try:
+            return int(round(float(val)))
+        except Exception:
+            return 0
+
+    # Debug: imprimir todos os totais individuais antes de somar
+    print("Totais individuais por campanha:")
+    for item in data:
+        print(f"{item.get('nome')}: {item.get('total')}")
+
     totals = {
-        "total": sum(item["total"] for item in data),
-        "total_atend": sum(item["total_atend"] for item in data),
+        "total": sum(safe_int(item.get("total", 0)) for item in data),
+        "total_atend": sum(safe_int(item.get("total_atend", 0)) for item in data),
         "aban": sum(item["aban"] for item in data),
         "aban_percent": str(
             avg_percentages([str(item["aban_percent"]) for item in data])
@@ -109,6 +121,8 @@ def create_pdf():
         "qtde": sum(item["qtde"] for item in data),
         "slr": avg_percentages([str(item["slr"]) for item in data]),
     }
+
+    print(f"Soma total calculada: {totals['total']}")
 
     # Caminho para o template HTML
     template_dir = "."
