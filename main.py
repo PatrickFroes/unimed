@@ -288,7 +288,20 @@ async def main():
     )
     retornos = await getReturn(period_criteria)
     for item in transformed_data_list:
-        item["qtde"] = float(retornos.get(item["nome"], 0.0))
+        retorno = float(retornos.get(item["nome"], 0.0))
+        item["qtde"] = retorno
+        # Corrigir: contabilizar retornos no total_atend
+        total_atend_com_retorno = float(item.get("total_atend", 0)) + retorno
+        total = float(item.get("total", 0))
+        # SLA: ((total_atend + retorno) * 100) / total
+        sla = (total_atend_com_retorno * 100 / total) if total else 0
+        # SLR: ((total_atend + retorno) * 100) / total
+        slr = sla
+        if slr > 100.0:
+            slr = 100.0
+        item["total_atend"] = total_atend_com_retorno
+        item["sl"] = f"{sla:.2f}%"
+        item["slr"] = f"{slr:.2f}%"
 
     data.clear()
     data.extend(transformed_data_list)
