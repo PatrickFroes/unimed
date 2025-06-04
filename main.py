@@ -23,8 +23,8 @@ client = Five9(username=username, password=password)
 # Defina aqui a data de inicio e fim do período que você deseja consultar
 # As datas estão no horário de Brasília (UTC-3)
 # As datas devem ser definidas no formato Ano-Mês-Dia Hora:Minuto:Segundo.Milissegundo
-start_brasilia = datetime(2025, 5, 1, 0, 0, 0, 0)
-end_brasilia = datetime(2025, 5, 31, 23, 59, 59, 999000)
+start_brasilia = datetime(2025, 4, 1, 0, 0, 0, 0)
+end_brasilia = datetime(2025, 4, 30, 23, 59, 59, 999000)
 
 def brasilia_to_utc3_str(dt_brasilia):
     return dt_brasilia.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
@@ -290,18 +290,34 @@ async def main():
     for item in transformed_data_list:
         retorno = float(retornos.get(item["nome"], 0.0))
         item["qtde"] = retorno
-        # Corrigir: contabilizar retornos no total_atend
-        total_atend_com_retorno = float(item.get("total_atend", 0)) + retorno
+        total_atend_original = float(item.get("total_atend", 0))
+        total_atend_com_retorno = total_atend_original + retorno
         total = float(item.get("total", 0))
+        aban = float(item.get("aban", 0))
+        aban_corrigido = aban - retorno
+        if aban_corrigido < 0:
+            aban_corrigido = 0
+        item["aban"] = aban_corrigido
+        # Porcentagem de abandonadas após retorno
+        if total > 0:
+            aban_percent = float((Decimal(aban_corrigido) / Decimal(total) * Decimal("100")).quantize(Decimal(".01"), rounding=ROUND_HALF_UP))
+        else:
+            aban_percent = 0
+        item["aban_percent"] = aban_percent
         # SLA: ((total_atend + retorno) * 100) / total
         sla = (total_atend_com_retorno * 100 / total) if total else 0
-        # SLR: ((total_atend + retorno) * 100) / total
-        slr = sla
-        if slr > 100.0:
-            slr = 100.0
+        if sla > 100.0:
+            sla = 100.0
         item["total_atend"] = total_atend_com_retorno
         item["sl"] = f"{sla:.2f}%"
-        item["slr"] = f"{slr:.2f}%"
+        # SLR: ((total_atend + retorno) * sla) / total_atend_original
+        if retorno > 0 and total_atend_original > 0:
+            slr = ((total_atend_com_retorno) * sla) / total_atend_original
+            if slr > 100.0:
+                slr = 100.0
+            item["slr"] = f"{slr:.2f}%"
+        else:
+            item["slr"] = "N/A"
 
     data.clear()
     data.extend(transformed_data_list)
