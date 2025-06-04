@@ -253,15 +253,17 @@ async def getTmaTme(period_criteria, transformed_data_list):
     }
     identifier = await run_report_async(client, "MyReports", "Relatório Chamadas (TMA e TME)", criteria)
     get_results = await get_report_result_async(client, identifier)
-    for idx, record in enumerate(get_results["records"]):
+    idx = 0
+    for record in get_results["records"]:
         record_data = record["values"]["data"]
-        # Ignorar Unimed Rio Verde
         nome_campanha = (record_data[0] or "").strip()
+        # Filtrar Unimed Rio Verde
         if normalize_nome_campanha(nome_campanha) == normalize_nome_campanha("Unimed Rio Verde"):
             continue
         if idx < len(transformed_data_list):
             transformed_data_list[idx]["tma"] = record_data[3] or "00:00:00"
             transformed_data_list[idx]["tme"] = record_data[4] or "00:00:00"
+        idx += 1
 
 async def getRelatorioSLA(period_criteria, transformed_data_list):
     criteria = {
@@ -272,14 +274,16 @@ async def getRelatorioSLA(period_criteria, transformed_data_list):
     }
     identifier = await run_report_async(client, "MyReports", "Relatório com o SLA", criteria)
     get_results = await get_report_result_async(client, identifier)
-    for idx, record in enumerate(get_results["records"]):
+    idx = 0
+    for record in get_results["records"]:
         record_data = record["values"]["data"]
-        # Ignorar Unimed Rio Verde
         nome_campanha = (record_data[0] or "").strip()
+        # Filtrar Unimed Rio Verde
         if normalize_nome_campanha(nome_campanha) == normalize_nome_campanha("Unimed Rio Verde"):
             continue
         if idx < len(transformed_data_list):
             transformed_data_list[idx]["sl"] = record_data[2] or "N/A"
+        idx += 1
 
 def merge_data(list_of_lists):
     merged = {}
