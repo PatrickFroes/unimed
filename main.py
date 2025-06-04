@@ -3,6 +3,7 @@ from five9 import Five9
 from gerar_pdf import data, create_pdf
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+import bisect
 
 meses_pt_to_en = {
     'jan': 'Jan', 'fev': 'Feb', 'mar': 'Mar', 'abr': 'Apr', 'mai': 'May',
@@ -23,8 +24,8 @@ client = Five9(username=username, password=password)
 # Defina aqui a data de inicio e fim do período que você deseja consultar
 # As datas estão no horário de Brasília (UTC-3)
 # As datas devem ser definidas no formato Ano-Mês-Dia Hora:Minuto:Segundo.Milissegundo
-start_brasilia = datetime(2025, 4, 1, 0, 0, 0, 0)
-end_brasilia = datetime(2025, 4, 30, 23, 59, 59, 999000)
+start_brasilia = datetime(2025, 5, 1, 0, 0, 0, 0)
+end_brasilia = datetime(2025, 5, 31, 23, 59, 59, 999000)
 
 def brasilia_to_utc3_str(dt_brasilia):
     return dt_brasilia.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
@@ -103,41 +104,49 @@ async def getReturn(period_criteria):
         "Unimed Gurupi", "Unimed Jataí", "Unimed Mineiros", "Unimed Morrinhos",
         "Unimed Regional Sul", "Unimed Rio Verde", "Unimed Vale do Corumbá", "Unimed Cerrado"
     ]
+    campanhas_normalizadas = {normalize_nome_campanha(camp): camp for camp in campanhas}
     retorno_dict = {camp: 0 for camp in campanhas}
-    criteria = {
-        "time": {
-            "start": period_criteria["start"],
-            "end": period_criteria["end"]
-        }
-    }
 
-    task_aband = asyncio.create_task(run_report_async(client, "MyReports", "Abandonadas", criteria))
-    task_contact = asyncio.create_task(run_report_async(client, "MyReports", "Contacted", criteria))
-    identifier_aband = await task_aband
-    identifier_contact = await task_contact
+    # Divida o período em 4 partes
+    periods = split_periods(period_criteria["start"], period_criteria["end"], n=4)
 
-    task_result_aband = asyncio.create_task(get_report_result_async(client, identifier_aband))
-    task_result_contact = asyncio.create_task(get_report_result_async(client, identifier_contact))
-    get_results = await task_result_aband
-    get_results2 = await task_result_contact
-
+    # Acumular todos os abandonados e contactados de todos os períodos
     lista_abandonadas = []
-    for record in get_results["records"]:
-        record_data = record["values"]["data"]
-        campanha = (record_data[2] or "").strip().lower()
-        dt = parse_five9_date(record_data[1])
-        nome = (record_data[0] or "").strip().lower()
-        lista_abandonadas.append((nome, dt, campanha))
-
     lista_contactadas = []
-    for record in get_results2["records"]:
-        record_data = record["values"]["data"]
-        campanha = (record_data[2] or "").strip().lower()
-        dt = parse_five9_date(record_data[1])
-        nome = (record_data[0] or "").strip().lower()
-        lista_contactadas.append((nome, dt, campanha))
 
-    from collections import defaultdict, deque
+    for period_start, period_end in periods:
+        criteria_partial = {
+            "time": {
+                "start": period_start,
+                "end": period_end
+            }
+        }
+        # Chamada parcial para abandonadas
+        task_aband = asyncio.create_task(run_report_async(client, "MyReports", "Abandonadas", criteria_partial))
+        task_contact = asyncio.create_task(run_report_async(client, "MyReports", "Contacted", criteria_partial))
+        identifier_aband = await task_aband
+        identifier_contact = await task_contact
+
+        task_result_aband = asyncio.create_task(get_report_result_async(client, identifier_aband))
+        task_result_contact = asyncio.create_task(get_report_result_async(client, identifier_contact))
+        get_results = await task_result_aband
+        get_results2 = await task_result_contact
+
+        for record in get_results["records"]:
+            record_data = record["values"]["data"]
+            campanha = normalize_nome_campanha(record_data[2] or "")
+            dt = parse_five9_date(record_data[1])
+            nome = (record_data[0] or "").strip().lower()
+            lista_abandonadas.append((nome, dt, campanha))
+
+        for record in get_results2["records"]:
+            record_data = record["values"]["data"]
+            campanha = normalize_nome_campanha(record_data[2] or "")
+            dt = parse_five9_date(record_data[1])
+            nome = (record_data[0] or "").strip().lower()
+            lista_contactadas.append((nome, dt, campanha))
+
+    from collections import defaultdict
     aband_dict = defaultdict(list)
     contact_dict = defaultdict(list)
     for nome, dt, campanha in lista_abandonadas:
@@ -148,21 +157,25 @@ async def getReturn(period_criteria):
         aband_dict[key].sort()
     for key in contact_dict:
         contact_dict[key].sort()
-        contact_dict[key] = deque(contact_dict[key])
+
+    RETORNO_JANELA_SEGUNDOS = 172800  # 48 horas
+
     for (nome, campanha), aband_list in aband_dict.items():
-        contacts = contact_dict.get((nome, campanha), deque())
+        contatos = contact_dict.get((nome, campanha), [])
+        usados = set()
         for dt_aband in aband_list:
-            idx_to_remove = None
-            for idx, dt_cont in enumerate(contacts):
-                if dt_cont > dt_aband and (dt_cont - dt_aband).total_seconds() <= 86400:
-                    idx_to_remove = idx
-                    break
-            if idx_to_remove is not None:
-                for camp_key in retorno_dict:
-                    if campanha == camp_key.strip().lower():
-                        retorno_dict[camp_key] += 1
-                        break
-                del contacts[idx_to_remove]
+            for idx, dt_cont in enumerate(contatos):
+                if idx in usados:
+                    continue
+                diff = (dt_cont - dt_aband).total_seconds()
+                if 0 < diff <= RETORNO_JANELA_SEGUNDOS:
+                    camp_key_normalizado = campanhas_normalizadas.get(campanha)
+                    if camp_key_normalizado:
+                        retorno_dict[camp_key_normalizado] += 1
+                    usados.add(idx)
+                    break  # Pareia apenas o primeiro contato válido para cada abandono
+        # Debug: após processar cada (nome, campanha)
+        print(f"Processado (nome, campanha): {nome}, {campanha} - abandonos: {len(aband_list)} contatos: {len(contatos)} retornos: {retorno_dict.get(campanhas_normalizadas.get(campanha,''),0)}")
     return retorno_dict
 
 async def getRelatorioChamadas(period_criteria, transformed_data_list):
@@ -310,9 +323,9 @@ async def main():
             sla = 100.0
         item["total_atend"] = total_atend_com_retorno
         item["sl"] = f"{sla:.2f}%"
-        # SLR: ((total_atend + retorno) * sla) / total_atend_original
-        if retorno > 0 and total_atend_original > 0:
-            slr = ((total_atend_com_retorno) * sla) / total_atend_original
+        # SLR: (total_atend_original * sla) / (total_atend_original + retorno)
+        if retorno > 0 and (total_atend_com_retorno) > 0:
+            slr = (total_atend_original * sla) / total_atend_com_retorno
             if slr > 100.0:
                 slr = 100.0
             item["slr"] = f"{slr:.2f}%"
@@ -322,6 +335,18 @@ async def main():
     data.clear()
     data.extend(transformed_data_list)
     create_pdf()
+
+def normalize_nome_campanha(nome):
+    # Remove acentos, espaços extras e converte para minúsculo
+    import unicodedata
+    if not isinstance(nome, str):
+        return ""
+    nome = nome.strip().lower()
+    nome = "".join(
+        c for c in unicodedata.normalize("NFD", nome)
+        if unicodedata.category(c) != "Mn"
+    )
+    return nome
 
 if __name__ == "__main__":
     asyncio.run(main())
