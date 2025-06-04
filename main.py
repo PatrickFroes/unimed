@@ -317,15 +317,20 @@ async def main():
         else:
             aban_percent = 0
         item["aban_percent"] = aban_percent
-        # SLA: ((total_atend + retorno) * 100) / total
-        sla = (total_atend_com_retorno * 100 / total) if total else 0
+        # SLA: (total_atend_original * 100) / total
+        sla = (total_atend_original * 100 / total) if total else 0
         if sla > 100.0:
             sla = 100.0
         item["total_atend"] = total_atend_com_retorno
         item["sl"] = f"{sla:.2f}%"
-        # SLR: (total_atend_original * sla) / (total_atend_original + retorno)
-        if retorno > 0 and (total_atend_com_retorno) > 0:
-            slr = (total_atend_original * sla) / total_atend_com_retorno
+        # percentual_retorno = (retorno / total) * 100
+        if total > 0:
+            percentual_retorno = (retorno / total) * 100
+        else:
+            percentual_retorno = 0
+        # SLR: sla + percentual_retorno, mas se não houver retorno, SLR = "N/A"
+        if total > 0 and retorno > 0:
+            slr = sla + percentual_retorno
             if slr > 100.0:
                 slr = 100.0
             item["slr"] = f"{slr:.2f}%"
