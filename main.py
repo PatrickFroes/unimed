@@ -102,7 +102,8 @@ async def getReturn(period_criteria):
     campanhas = [
         "Unimed Anápolis", "Unimed Araguaína", "Unimed Caldas Novas", "Unimed Catalão",
         "Unimed Gurupi", "Unimed Jataí", "Unimed Mineiros", "Unimed Morrinhos",
-        "Unimed Regional Sul", "Unimed Rio Verde", "Unimed Vale do Corumbá", "Unimed Cerrado"
+        "Unimed Regional Sul", "Unimed Vale do Corumbá", "Unimed Cerrado"
+        # "Unimed Rio Verde" removida
     ]
     campanhas_normalizadas = {normalize_nome_campanha(camp): camp for camp in campanhas}
     retorno_dict = {camp: 0 for camp in campanhas}
@@ -135,6 +136,9 @@ async def getReturn(period_criteria):
         for record in get_results["records"]:
             record_data = record["values"]["data"]
             campanha = normalize_nome_campanha(record_data[2] or "")
+            # Ignorar Unimed Rio Verde
+            if campanha == normalize_nome_campanha("Unimed Rio Verde"):
+                continue
             dt = parse_five9_date(record_data[1])
             nome = (record_data[0] or "").strip().lower()
             lista_abandonadas.append((nome, dt, campanha))
@@ -142,6 +146,9 @@ async def getReturn(period_criteria):
         for record in get_results2["records"]:
             record_data = record["values"]["data"]
             campanha = normalize_nome_campanha(record_data[2] or "")
+            # Ignorar Unimed Rio Verde
+            if campanha == normalize_nome_campanha("Unimed Rio Verde"):
+                continue
             dt = parse_five9_date(record_data[1])
             nome = (record_data[0] or "").strip().lower()
             lista_contactadas.append((nome, dt, campanha))
@@ -208,6 +215,9 @@ async def getRelatorioChamadas(period_criteria, transformed_data_list):
     for record in get_results["records"]:
         record_data = record["values"]["data"]
         nome_campanha = (record_data[0] or "").strip()
+        # Ignorar Unimed Rio Verde
+        if normalize_nome_campanha(nome_campanha) == normalize_nome_campanha("Unimed Rio Verde"):
+            continue
         total_atend = safe_int(record_data[1])
         aban = safe_int(record_data[2])
         total_raw = safe_total(record_data[4])
@@ -245,6 +255,10 @@ async def getTmaTme(period_criteria, transformed_data_list):
     get_results = await get_report_result_async(client, identifier)
     for idx, record in enumerate(get_results["records"]):
         record_data = record["values"]["data"]
+        # Ignorar Unimed Rio Verde
+        nome_campanha = (record_data[0] or "").strip()
+        if normalize_nome_campanha(nome_campanha) == normalize_nome_campanha("Unimed Rio Verde"):
+            continue
         if idx < len(transformed_data_list):
             transformed_data_list[idx]["tma"] = record_data[3] or "00:00:00"
             transformed_data_list[idx]["tme"] = record_data[4] or "00:00:00"
@@ -260,6 +274,10 @@ async def getRelatorioSLA(period_criteria, transformed_data_list):
     get_results = await get_report_result_async(client, identifier)
     for idx, record in enumerate(get_results["records"]):
         record_data = record["values"]["data"]
+        # Ignorar Unimed Rio Verde
+        nome_campanha = (record_data[0] or "").strip()
+        if normalize_nome_campanha(nome_campanha) == normalize_nome_campanha("Unimed Rio Verde"):
+            continue
         if idx < len(transformed_data_list):
             transformed_data_list[idx]["sl"] = record_data[2] or "N/A"
 
@@ -268,6 +286,9 @@ def merge_data(list_of_lists):
     unique_keys = set()
     for data_list in list_of_lists:
         for item in data_list:
+            # Ignorar Unimed Rio Verde
+            if normalize_nome_campanha(item.get("nome", "")) == normalize_nome_campanha("Unimed Rio Verde"):
+                continue
             key = (
                 (item["nome"] or "").strip().lower(),
                 int(item.get("total_atend", 0)),
@@ -300,7 +321,12 @@ async def main():
         getRelatorioSLA(period_criteria, transformed_data_list),
     )
     retornos = await getReturn(period_criteria)
-    for item in transformed_data_list:
+    # Filtrar Unimed Rio Verde antes de processar
+    filtered_data_list = [
+        item for item in transformed_data_list
+        if normalize_nome_campanha(item.get("nome", "")) != normalize_nome_campanha("Unimed Rio Verde")
+    ]
+    for item in filtered_data_list:
         retorno = float(retornos.get(item["nome"], 0.0))
         item["qtde"] = retorno
         total_atend_original = float(item.get("total_atend", 0))
@@ -329,7 +355,7 @@ async def main():
         else:
             percentual_retorno = 0
         # SLR: sla + percentual_retorno, mas se não houver retorno, SLR = "N/A"
-        if total > 0 and retorno > 0:
+        if total > 0:
             slr = sla + percentual_retorno
             if slr > 100.0:
                 slr = 100.0
@@ -338,8 +364,9 @@ async def main():
             item["slr"] = "N/A"
 
     data.clear()
-    data.extend(transformed_data_list)
-    create_pdf()
+    data.extend(filtered_data_list)
+    # Passar mês e ano do relatório para o PDF
+    create_pdf(report_month=start_brasilia.month, report_year=start_brasilia.year)
 
 def normalize_nome_campanha(nome):
     # Remove acentos, espaços extras e converte para minúsculo

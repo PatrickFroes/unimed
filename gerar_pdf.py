@@ -79,7 +79,7 @@ def avg_percentages(percentages):
     return f"{avg:.2f}%"
 
 
-def create_pdf():
+def create_pdf(report_month=None, report_year=None):
     # Lista de meses para o nome
     meses = [
         "Janeiro",
@@ -132,15 +132,20 @@ def create_pdf():
     env = Environment(loader=FileSystemLoader(template_dir))
     template = env.get_template(template_file)
 
-    # Pegando o mês para colocar no nome
-    hoje = datetime.today()
-    primeiro_dia_mes_atual = hoje.replace(day=1)
-    ultimo_dia_mes_anterior = primeiro_dia_mes_atual - timedelta(days=1)
-    previousMonth = meses[ultimo_dia_mes_anterior.month - 1]
+    # Determinar mês e ano do relatório
+    if report_month is not None and report_year is not None:
+        previousMonth = meses[report_month - 1]
+        year_str = str(report_year)
+    else:
+        hoje = datetime.today()
+        primeiro_dia_mes_atual = hoje.replace(day=1)
+        ultimo_dia_mes_anterior = primeiro_dia_mes_atual - timedelta(days=1)
+        previousMonth = meses[ultimo_dia_mes_anterior.month - 1]
+        year_str = str(ultimo_dia_mes_anterior.year)
 
     # Caminho para o arquivo CSS e PDF
     css_file = "relatorio.css"
-    output_pdf = f"relatorios\\Relatorio_{previousMonth}.pdf"
+    output_pdf = f"relatorios\\Relatorio_{previousMonth}_{year_str}.pdf"
 
     # Data do relatório
     issue_date = datetime.now().strftime("%d/%m/%Y")
